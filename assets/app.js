@@ -519,6 +519,262 @@ function openBatchA47Modal() {
   $("claim-modal").classList.remove("hidden");
 }
 
+function openComponentModal(componentId, searchQuery = "") {
+  const comp = FLEET.componentsCatalog.find((c) => c.id === componentId) || FLEET.componentsCatalog[0];
+  const compAnalytics = ANALYTICS.byComponent.find((c) => c.id === comp.id) || { count: 0, rate: 0 };
+  const q = searchQuery.toLowerCase().trim();
+  const claimsForComp = FLEET.claims.filter((c) => c.component === comp.id && (!q || `${c.id} ${c.serial} ${c.batch} ${c.reason} ${c.decision}`.toLowerCase().includes(q))).slice(0, 30);
+
+  $("modal-claim-id").textContent = "COMPONENT TELEMETRY & RETURNS";
+  $("modal-claim-badge").className = comp.id === "left earbud" ? "badge alert" : "badge replace";
+  $("modal-claim-badge").textContent = `${compAnalytics.count} Returns (${pct(compAnalytics.rate)})`;
+  $("modal-claim-title").textContent = `${comp.name} · Subsystem Reliability Breakdown`;
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Total Returned Units</div>
+        <div class="meta-val" style="color:var(--orange)">${compAnalytics.count.toLocaleString()} units</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Share of All Returns</div>
+        <div class="meta-val">${pct(compAnalytics.rate)} of return volume</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Primary Failure Symptom</div>
+        <div class="meta-val">${comp.defaultReason}</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Manufacturing Status</div>
+        <div class="meta-val" style="color:${comp.id === "left earbud" ? "var(--red)" : "var(--ok)"}">
+          ${comp.id === "left earbud" ? "⚠️ Stop-Ship Recall Cluster" : "✓ In-Control Process"}
+        </div>
+      </div>
+    </div>
+
+    <div class="step" style="background:#faf6f1">
+      <h4>Engineering Teardown & Root Cause:</h4>
+      <p style="margin-top:6px;line-height:1.5">
+        ${comp.rootCause}
+      </p>
+    </div>
+
+    <div class="reviews-filter-bar">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:13px">Return Claims for ${comp.name}</span>
+        <span class="muted" style="font-size:12px">${compAnalytics.count} recorded</span>
+      </div>
+      <input id="comp-claim-search" value="${searchQuery}" placeholder="Filter claims for ${comp.name} by ID, serial, or batch..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px;width:100%" />
+    </div>
+
+    <div style="max-height:36vh;overflow-y:auto">
+      <table>
+        <thead>
+          <tr><th>Claim</th><th>Date</th><th>Serial</th><th>Batch</th><th>Reason</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          ${claimsForComp.length === 0 ? `
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No claims found matching search.</td></tr>
+          ` : claimsForComp.map((c) => `
+            <tr class="clickable-row" data-comp-claim-id="${c.id}">
+              <td class="mono">${c.id}</td>
+              <td>${c.createdAt}</td>
+              <td class="mono">${c.serial}</td>
+              <td><span class="badge ${c.batch === "A47" ? "alert" : "replace"}">${c.batch}</span></td>
+              <td>${c.reason}</td>
+              <td><button class="badge ${c.decision.toLowerCase()}">${c.decision}</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn primary" id="btn-comp-test-arbiter">⚡ Adjudicate a ${comp.name} Return</button>
+    <button class="btn" id="btn-comp-close">Close</button>
+  `;
+
+  const searchInput = $("comp-claim-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      openComponentModal(componentId, e.target.value);
+    });
+  }
+
+  $("modal-body").querySelectorAll("[data-comp-claim-id]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      openClaimModal(tr.dataset.compClaimId);
+    });
+  });
+
+  $("btn-comp-test-arbiter").addEventListener("click", () => {
+    closeClaimModal();
+    if (comp.id === "left earbud") playDemo("a47");
+    else playDemo("reject");
+  });
+
+  $("btn-comp-close").addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
+function openBatchDetailModal(batchId, searchQuery = "") {
+  const batch = ANALYTICS.byBatch.find((b) => b.id === batchId) || ANALYTICS.byBatch[0];
+  const q = searchQuery.toLowerCase().trim();
+  const claimsForBatch = FLEET.claims.filter((c) => c.batch === batch.id && (!q || `${c.id} ${c.serial} ${c.component} ${c.reason} ${c.decision}`.toLowerCase().includes(q))).slice(0, 30);
+
+  $("modal-claim-id").textContent = `FACTORY BATCH #${batch.id}`;
+  $("modal-claim-badge").className = batch.id === "A47" || batch.id === "A48" ? "badge alert" : "badge ok";
+  $("modal-claim-badge").textContent = batch.status;
+  $("modal-claim-title").textContent = `Batch #${batch.id} · ${batch.factory} (${batch.lotDate})`;
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Manufacturing Facility</div>
+        <div class="meta-val">${batch.factory}</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Lot Production Run</div>
+        <div class="meta-val mono">${batch.units.toLocaleString()} units produced</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Lot Return Rate</div>
+        <div class="meta-val" style="color:${batch.rate > 0.1 ? "var(--red)" : "var(--ok)"}">${pct(batch.rate)} (${batch.returns} returns)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Quality Status</div>
+        <div class="meta-val" style="color:${batch.id === "A47" ? "var(--red)" : "var(--ok)"}">${batch.status}</div>
+      </div>
+    </div>
+
+    <div class="step" style="background:#faf6f1">
+      <h4>Lot Quality Telemetry & SMT Diagnostics:</h4>
+      <p style="margin-top:6px;line-height:1.5">
+        ${batch.note}. Factory line yield baseline is 4.5%–5.5%. Batch #${batch.id} represents a ${batch.rate > 0.1 ? "statistically significant failure cluster requiring immediate quarantine" : "standard nominal production run within 6-sigma tolerances"}.
+      </p>
+    </div>
+
+    <div class="reviews-filter-bar">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:13px">Returns Recorded for Batch #${batch.id}</span>
+        <span class="muted" style="font-size:12px">${batch.returns} total</span>
+      </div>
+      <input id="batch-claim-search" value="${searchQuery}" placeholder="Filter claims for Batch ${batch.id} by ID, serial, or component..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px;width:100%" />
+    </div>
+
+    <div style="max-height:36vh;overflow-y:auto">
+      <table>
+        <thead>
+          <tr><th>Claim</th><th>Date</th><th>Serial</th><th>Component</th><th>Reason</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          ${claimsForBatch.length === 0 ? `
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No claims found matching search.</td></tr>
+          ` : claimsForBatch.map((c) => `
+            <tr class="clickable-row" data-batch-claim-id="${c.id}">
+              <td class="mono">${c.id}</td>
+              <td>${c.createdAt}</td>
+              <td class="mono">${c.serial}</td>
+              <td>${c.component}</td>
+              <td>${c.reason}</td>
+              <td><button class="badge ${c.decision.toLowerCase()}">${c.decision}</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn primary" id="btn-batch-units">🔍 Explore All ${batch.units.toLocaleString()} Units in Batch ${batch.id}</button>
+    <button class="btn" id="btn-batch-close">Close</button>
+  `;
+
+  const searchInput = $("batch-claim-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      openBatchDetailModal(batchId, e.target.value);
+    });
+  }
+
+  $("modal-body").querySelectorAll("[data-batch-claim-id]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      openClaimModal(tr.dataset.batchClaimId);
+    });
+  });
+
+  $("btn-batch-units").addEventListener("click", () => {
+    closeClaimModal();
+    openUnitsModal(`PB-${batch.id}`);
+  });
+
+  $("btn-batch-close").addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
+function openWhyThisMattersModal() {
+  $("modal-claim-id").textContent = "WARRANTY ROI & QUALITY INTELLIGENCE";
+  $("modal-claim-badge").className = "badge ok";
+  $("modal-claim-badge").textContent = "$371,800 Reserves Protected";
+  $("modal-claim-title").textContent = "Financial Impact · Precision Lot Isolation vs Broad Recall";
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid" style="grid-template-columns:repeat(3, 1fr)">
+      <div class="meta-item">
+        <div class="meta-label">Cost per Single RMA</div>
+        <div class="meta-val" style="color:var(--ok)">$18.50 average</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Broad 10k Market Recall</div>
+        <div class="meta-val" style="color:var(--red)">$450,000+ brand cost</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Supplier Chargeback</div>
+        <div class="meta-val" style="color:var(--orange)">$78,200 recovered</div>
+      </div>
+    </div>
+
+    <div class="step" style="background:#faf6f1">
+      <h4>Why Lot-Level Return Telemetry Matters:</h4>
+      <p style="margin-top:6px;line-height:1.5">
+        Without precision warranty arbitration, brands face two costly extremes:
+      </p>
+      <ul style="margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.6">
+        <li><strong>Blind Full-Fleet Recall:</strong> Recalling all 10,000 PulseBuds Pro would waste <strong>7,800 perfectly healthy units</strong> across lots B12, B14, and C03 ($371,800 wasted).</li>
+        <li><strong>Ignoring the Defect:</strong> Treating Batch A47 returns as random one-off user errors causes customer churn and 1-star review floods (18+ negative reviews on retail channels).</li>
+      </ul>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Protected Sound Inventory</div>
+        <div class="meta-val">7,800 units saved from recall</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Instant RMA Auto-Approval</div>
+        <div class="meta-val" style="color:var(--orange)">Zero-friction for genuine A47 victims</div>
+      </div>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn primary" id="btn-why-demo">⚡ Run Defect Decision Demo</button>
+    <button class="btn" id="btn-why-close">Close</button>
+  `;
+
+  $("btn-why-demo").addEventListener("click", () => {
+    closeClaimModal();
+    playDemo("a47");
+  });
+
+  $("btn-why-close").addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
 function renderKpis() {
   const a = ANALYTICS;
   const cr = CUSTOMER_REVIEWS;
@@ -528,7 +784,7 @@ function renderKpis() {
     <div class="card kpi clickable" id="kpi-units" title="Click to explore 10,000 produced units & lot catalog">
       <div class="label">Units produced</div>
       <div class="value">${a.produced.toLocaleString()}</div>
-      <div class="delta ok">PulseBuds Pro · 3 lots <span class="kpi-hint">↗</span></div>
+      <div class="delta ok">PulseBuds Pro · 5 lots <span class="kpi-hint">↗</span></div>
     </div>
     <div class="card kpi clickable" id="kpi-returns" title="Click to view all 1,143 return tickets">
       <div class="label">Returns received</div>
@@ -567,13 +823,53 @@ function renderKpis() {
   $("kpi-batch").addEventListener("click", () => openBatchA47Modal());
   $("alert-a47-banner").addEventListener("click", () => openBatchA47Modal());
 
+  // Render expanded component list
   $("component-bars").innerHTML = a.byComponent.map((c) => `
-    <div class="bar-row"><span>${c.name}</span><div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div><span>${c.count}</span></div>
+    <div class="bar-row clickable" data-comp-id="${c.id}" title="Click to inspect ${c.name} (${c.count} returns)">
+      <span>${c.name}</span>
+      <div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div>
+      <span>${c.count}</span>
+    </div>
   `).join("");
 
+  $("component-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
+    row.addEventListener("click", () => openComponentModal(row.dataset.compId));
+  });
+
+  // Render expanded batch list
   $("batch-bars").innerHTML = a.byBatch.map((b) => `
-    <div class="bar-row"><span>${b.id}</span><div class="bar"><span style="width:${Math.min(100, b.rate * 320)}%"></span></div><span>${pct(b.rate)}</span></div>
+    <div class="bar-row clickable" data-batch-id="${b.id}" title="Click to inspect Batch #${b.id} · ${b.factory} (${pct(b.rate)})">
+      <span>${b.id} · ${b.factory}</span>
+      <div class="bar"><span style="width:${Math.min(100, b.rate * 280)}%"></span></div>
+      <span>${pct(b.rate)}</span>
+    </div>
   `).join("");
+
+  $("batch-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
+    row.addEventListener("click", () => openBatchDetailModal(row.dataset.batchId));
+  });
+
+  // Attach click handler to Why this matters card
+  const whyCard = $("why-matters-card");
+  if (whyCard) {
+    whyCard.addEventListener("click", () => openWhyThisMattersModal());
+  }
+
+  const compCard = $("card-components");
+  if (compCard) {
+    compCard.addEventListener("click", (e) => {
+      if (e.target.closest(".bar-row")) return;
+      openComponentModal("left earbud");
+    });
+  }
+
+  const batchCard = $("card-batches");
+  if (batchCard) {
+    batchCard.addEventListener("click", (e) => {
+      if (e.target.closest(".bar-row")) return;
+      openBatchA47Modal();
+    });
+  }
 
   $("intel-table").innerHTML = FLEET.claims.slice(0, 8).map((c) => `
     <tr class="clickable-row" data-claim-id="${c.id}">

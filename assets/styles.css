@@ -258,10 +258,31 @@ button { cursor: pointer; }
   70% { box-shadow: 0 0 0 12px rgba(255, 102, 0, 0); }
 }
 
-.bars { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
-.bar-row { display: grid; grid-template-columns: 110px 1fr 48px; gap: 12px; align-items: center; font-size: 13px; color: var(--muted); }
+.bars { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.bar-row {
+  display: grid;
+  grid-template-columns: 145px 1fr 48px;
+  gap: 12px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 5px 8px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+.bar-row.clickable {
+  cursor: pointer;
+}
+.bar-row.clickable:hover {
+  background: rgba(255, 102, 0, 0.08);
+  transform: translateX(2px);
+}
+.bar-row.clickable:hover span:first-child {
+  color: var(--orange-hover);
+  font-weight: 700;
+}
 .bar {
-  height: 9px;
+  height: 8px;
   background: rgba(200, 145, 95, 0.16);
   border-radius: 99px;
   overflow: hidden;
