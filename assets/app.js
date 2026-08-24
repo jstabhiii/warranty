@@ -182,15 +182,370 @@ async function loadClaimIntoIntake(claim) {
   showToast("Claim Loaded into Arbiter", `Evaluated ${claim.id} (${claim.serial}) through live policy engine.`, "info");
 }
 
+function openReviewsModal(starFilter = "all", searchQuery = "") {
+  const cr = CUSTOMER_REVIEWS;
+  const q = searchQuery.toLowerCase().trim();
+
+  const filtered = cr.reviews.filter((r) => {
+    let matchStar = true;
+    if (starFilter === "5") matchStar = r.rating === 5;
+    else if (starFilter === "4") matchStar = r.rating === 4;
+    else if (starFilter === "3") matchStar = r.rating === 3;
+    else if (starFilter === "2") matchStar = r.rating === 2;
+    else if (starFilter === "1") matchStar = r.rating === 1;
+    else if (starFilter === "issue") matchStar = r.tag === "Left Earbud Issue";
+
+    const matchQuery = !q || 
+      r.author.toLowerCase().includes(q) || 
+      r.title.toLowerCase().includes(q) || 
+      r.content.toLowerCase().includes(q) || 
+      r.tag.toLowerCase().includes(q) ||
+      (r.batch && r.batch.toLowerCase().includes(q));
+
+    return matchStar && matchQuery;
+  });
+
+  $("modal-claim-id").textContent = "CUSTOMER SENTIMENT & REVIEWS";
+  $("modal-claim-badge").className = "badge ok";
+  $("modal-claim-badge").textContent = `${cr.total} Verified Reviews`;
+  $("modal-claim-title").textContent = "PulseBuds Pro · Customer Ratings & Fleet Feedback";
+
+  const renderStars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+
+  $("modal-body").innerHTML = `
+    <div class="reviews-summary-grid">
+      <div class="score-box">
+        <div class="big-score">${cr.average}</div>
+        <div class="stars-row">${renderStars(4)}</div>
+        <div class="score-subtitle">100 Verified Customers</div>
+        <div style="margin-top:8px">
+          <span class="badge alert" style="font-size:10px;padding:2px 6px">⚠️ ${cr.leftIssueCount}% reported dead left bud</span>
+        </div>
+      </div>
+      <div class="star-bars">
+        ${[5, 4, 3, 2, 1].map((s) => `
+          <div class="star-bar-row">
+            <span>${s} ★</span>
+            <div class="star-bar">
+              <div class="star-bar-fill" style="width:${(cr.counts[s] / cr.total) * 100}%"></div>
+            </div>
+            <span style="text-align:right">${cr.counts[s]}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="reviews-filter-bar">
+      <input id="review-search-input" value="${searchQuery}" placeholder="Search 100 customer reviews (e.g. 'left earbud', 'bass', 'A47', 'battery')..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px" />
+      <div class="review-filter-chips">
+        <button class="review-filter-chip ${starFilter === "all" ? "active" : ""}" data-filter="all">All (${cr.total})</button>
+        <button class="review-filter-chip ${starFilter === "5" ? "active" : ""}" data-filter="5">5 ★ (${cr.counts[5]})</button>
+        <button class="review-filter-chip ${starFilter === "4" ? "active" : ""}" data-filter="4">4 ★ (${cr.counts[4]})</button>
+        <button class="review-filter-chip ${starFilter === "3" ? "active" : ""}" data-filter="3">3 ★ (${cr.counts[3]})</button>
+        <button class="review-filter-chip ${starFilter === "2" ? "active" : ""}" data-filter="2">2 ★ (${cr.counts[2]})</button>
+        <button class="review-filter-chip ${starFilter === "1" ? "active" : ""}" data-filter="1">1 ★ (${cr.counts[1]})</button>
+        <button class="review-filter-chip ${starFilter === "issue" ? "active" : ""}" data-filter="issue" style="color:#ea580c;border-color:rgba(255,102,0,0.3)">⚠️ Left Earbud Defect (${cr.leftIssueCount})</button>
+      </div>
+    </div>
+
+    <div class="reviews-list">
+      ${filtered.length === 0 ? `
+        <div style="text-align:center;padding:32px;color:var(--muted)">No customer reviews found matching your search.</div>
+      ` : filtered.map((r) => `
+        <div class="review-card">
+          <div class="review-header">
+            <div class="review-author-info">
+              <div class="review-avatar">${r.author.charAt(0)}</div>
+              <span class="review-author-name">${r.author}</span>
+              <span class="verified-tag">✓ Verified</span>
+            </div>
+            <div class="review-meta-right">
+              <span class="review-stars">${renderStars(r.rating)}</span>
+              <span class="review-date">${r.date}</span>
+              ${r.batch ? `<span class="badge replace" style="font-size:10px;padding:1px 6px">Lot #${r.batch}</span>` : ""}
+            </div>
+          </div>
+          <div class="review-title">${r.title}</div>
+          <div class="review-body">${r.content}</div>
+          <div class="review-footer">
+            <span class="review-tag ${r.tag === "Left Earbud Issue" ? "issue" : ""}">${r.tag}</span>
+            <button class="review-helpful-btn" onclick="this.textContent = '👍 Helpful (' + (${r.helpful} + 1) + ')'; this.disabled = true;">👍 Helpful (${r.helpful})</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn primary" id="btn-review-load-arbiter">🔍 Cross-Reference Left Earbud Defect in Arbiter</button>
+    <button class="btn" id="btn-review-close">Close</button>
+  `;
+
+  // Attach Filter Listeners
+  $("modal-body").querySelectorAll(".review-filter-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openReviewsModal(btn.dataset.filter, $("review-search-input").value);
+    });
+  });
+
+  const searchInput = $("review-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      openReviewsModal(starFilter, e.target.value);
+    });
+  }
+
+  const loadArbiterBtn = $("btn-review-load-arbiter");
+  if (loadArbiterBtn) {
+    loadArbiterBtn.addEventListener("click", () => {
+      closeClaimModal();
+      playDemo("a47");
+    });
+  }
+
+  const closeBtn = $("btn-review-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeClaimModal);
+  }
+
+  $("claim-modal").classList.remove("hidden");
+}
+
+function openUnitsModal(searchQuery = "") {
+  const q = searchQuery.toLowerCase().trim();
+  const filteredUnits = FLEET.units.filter((u) => !q || u.serial.toLowerCase().includes(q) || u.batch.toLowerCase().includes(q) || u.channel.toLowerCase().includes(q)).slice(0, 30);
+
+  $("modal-claim-id").textContent = "FLEET PRODUCTION CATALOG";
+  $("modal-claim-badge").className = "badge ok";
+  $("modal-claim-badge").textContent = "10,000 Units Produced";
+  $("modal-claim-title").textContent = "PulseBuds Pro · Production Lots & Inventory Explorer";
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid" style="grid-template-columns:repeat(3, 1fr)">
+      <div class="meta-item">
+        <div class="meta-label">Batch A47 (Cluster)</div>
+        <div class="meta-val" style="color:var(--orange)">2,200 units · 32% return</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Batch B12 (Normal)</div>
+        <div class="meta-val">4,100 units · 5.8% return</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Batch C03 (Top Yield)</div>
+        <div class="meta-val" style="color:var(--ok)">3,700 units · 4.8% return</div>
+      </div>
+    </div>
+
+    <input id="unit-search-input" value="${searchQuery}" placeholder="Search 10,000 serials (e.g. 'PB-A47', 'PB-B12', 'Direct')..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px;width:100%" />
+
+    <div style="max-height:42vh;overflow-y:auto">
+      <table>
+        <thead>
+          <tr><th>Serial</th><th>Batch</th><th>Purchased</th><th>Channel</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          ${filteredUnits.map((u) => `
+            <tr>
+              <td class="mono" style="font-weight:600">${u.serial}</td>
+              <td><span class="badge ${u.batch === "A47" ? "alert" : "replace"}">${u.batch}</span></td>
+              <td>${u.purchasedAt}</td>
+              <td>${u.channel}</td>
+              <td><button class="badge replace" data-unit-serial="${u.serial}">Adjudicate ↗</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn" id="btn-unit-close">Close</button>
+  `;
+
+  const searchInput = $("unit-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      openUnitsModal(e.target.value);
+    });
+  }
+
+  $("modal-body").querySelectorAll("[data-unit-serial]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      closeClaimModal();
+      setView("intake");
+      $("serial").value = btn.dataset.unitSerial;
+      onSerial();
+      generate(btn.dataset.unitSerial.includes("A47") ? "mfg-left" : "physical");
+    });
+  });
+
+  const closeBtn = $("btn-unit-close");
+  if (closeBtn) closeBtn.addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
+function openReturnsModal(searchQuery = "") {
+  const q = searchQuery.toLowerCase().trim();
+  const filteredClaims = FLEET.claims.filter((c) => !q || `${c.id} ${c.serial} ${c.batch} ${c.component} ${c.reason} ${c.decision}`.toLowerCase().includes(q)).slice(0, 35);
+
+  $("modal-claim-id").textContent = "RETURNS RECEIVED EXPLORER";
+  $("modal-claim-badge").className = "badge alert";
+  $("modal-claim-badge").textContent = `${FLEET.claims.length} Return Tickets`;
+  $("modal-claim-title").textContent = "PulseBuds Pro · Live Inbound Return Claims";
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid" style="grid-template-columns:repeat(3, 1fr)">
+      <div class="meta-item">
+        <div class="meta-label">Left Earbud</div>
+        <div class="meta-val" style="color:var(--orange)">730 claims (64%)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Right Earbud</div>
+        <div class="meta-val">245 claims (21%)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Charging Case</div>
+        <div class="meta-val">168 claims (15%)</div>
+      </div>
+    </div>
+
+    <input id="return-search-input" value="${searchQuery}" placeholder="Filter 1,143 claims by ID, serial, reason, or batch..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px;width:100%" />
+
+    <div style="max-height:42vh;overflow-y:auto">
+      <table>
+        <thead>
+          <tr><th>Claim</th><th>Date</th><th>Serial</th><th>Batch</th><th>Component</th><th>Decision</th></tr>
+        </thead>
+        <tbody>
+          ${filteredClaims.map((c) => `
+            <tr class="clickable-row" data-modal-claim-id="${c.id}">
+              <td class="mono">${c.id}</td>
+              <td>${c.createdAt}</td>
+              <td class="mono">${c.serial}</td>
+              <td>${c.batch}</td>
+              <td>${c.component}</td>
+              <td><button class="badge ${c.decision.toLowerCase()}">${c.decision}</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn" id="btn-return-close">Close</button>
+  `;
+
+  const searchInput = $("return-search-input");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      openReturnsModal(e.target.value);
+    });
+  }
+
+  $("modal-body").querySelectorAll("[data-modal-claim-id]").forEach((tr) => {
+    tr.addEventListener("click", () => {
+      openClaimModal(tr.dataset.modalClaimId);
+    });
+  });
+
+  const closeBtn = $("btn-return-close");
+  if (closeBtn) closeBtn.addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
+function openBatchA47Modal() {
+  $("modal-claim-id").textContent = "CAPA QUALITY DEFECT BULLETIN";
+  $("modal-claim-badge").className = "badge alert";
+  $("modal-claim-badge").textContent = "Manufacturing Stop-Ship Alert";
+  $("modal-claim-title").textContent = "Batch #A47 · Left Driver Solder Fatigue Cluster";
+
+  $("modal-body").innerHTML = `
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Affected Production Lot</div>
+        <div class="meta-val mono">Batch A47 (2,200 units)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Lot Return Rate</div>
+        <div class="meta-val" style="color:var(--orange)">32.0% (5.5x normal baseline)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Component Concentration</div>
+        <div class="meta-val">93% Left Earbud silence</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Customer Reviews Signal</div>
+        <div class="meta-val" style="color:var(--orange)">18 Reviews cite silent left driver</div>
+      </div>
+    </div>
+
+    <div class="step" style="background:#faf6f1">
+      <h4>Root Cause Analysis & Policy Action:</h4>
+      <p style="margin-top:6px;line-height:1.5">
+        Automated on-device computer vision confirms no external housing impact fractures on silent left units from lot A47. 
+        Telemetry identifies cold solder joint degradation on the left transducer driver during assembly.
+      </p>
+      <div style="margin-top:10px;padding:10px;background:#ffffff;border-radius:8px;border:1px solid var(--line-light)">
+        <strong>Active Policy Directives:</strong>
+        <ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)">
+          <li>Auto-approve zero-cost <strong>Replacement</strong> for any in-warranty A47 left-silent claim with intact housing.</li>
+          <li>Pause warehouse shipments of remaining 340 inventory units from Batch A47.</li>
+          <li>Supplier CAPA ticket #CAPA-2026-088 opened with manufacturing line #2.</li>
+        </ul>
+      </div>
+    </div>
+  `;
+
+  $("modal-actions").innerHTML = `
+    <button class="btn primary" id="btn-a47-run-demo">⚡ Run A47 Arbiter Demo Claim</button>
+    <button class="btn" id="btn-a47-view-reviews">⭐ View Customer Reviews</button>
+    <button class="btn" id="btn-a47-close">Close</button>
+  `;
+
+  $("btn-a47-run-demo").addEventListener("click", () => {
+    closeClaimModal();
+    playDemo("a47");
+  });
+
+  $("btn-a47-view-reviews").addEventListener("click", () => {
+    openReviewsModal("issue");
+  });
+
+  $("btn-a47-close").addEventListener("click", closeClaimModal);
+
+  $("claim-modal").classList.remove("hidden");
+}
+
 function renderKpis() {
   const a = ANALYTICS;
+  const cr = CUSTOMER_REVIEWS;
   const a47 = a.byBatch.find((b) => b.id === "A47");
+
   $("kpis").innerHTML = `
-    <div class="card kpi"><div class="label">Units produced</div><div class="value">${a.produced.toLocaleString()}</div><div class="delta ok">PulseBuds Pro · 3 lots</div></div>
-    <div class="card kpi"><div class="label">Returns received</div><div class="value">${a.returns.toLocaleString()}</div><div class="delta up">${pct(a.returns / a.produced)} of production</div></div>
-    <div class="card kpi"><div class="label">Left-earbud returns</div><div class="value">${pct(a.leftShare)}</div><div class="delta up">of all return tickets</div></div>
-    <div class="card kpi"><div class="label">Of those, batch A47</div><div class="value">${pct(a.leftFromA47)}</div><div class="delta up">clustered manufacturing signal</div></div>
-    <div class="card alert">
+    <div class="card kpi clickable" id="kpi-units" title="Click to explore 10,000 produced units & lot catalog">
+      <div class="label">Units produced</div>
+      <div class="value">${a.produced.toLocaleString()}</div>
+      <div class="delta ok">PulseBuds Pro · 3 lots <span class="kpi-hint">↗</span></div>
+    </div>
+    <div class="card kpi clickable" id="kpi-returns" title="Click to view all 1,143 return tickets">
+      <div class="label">Returns received</div>
+      <div class="value">${a.returns.toLocaleString()}</div>
+      <div class="delta up">${pct(a.returns / a.produced)} of production <span class="kpi-hint">↗</span></div>
+    </div>
+    <div class="card kpi clickable" id="kpi-reviews" title="Click to view 100+ customer reviews & ratings">
+      <div class="label">Customer reviews</div>
+      <div class="value">${cr.average} ★</div>
+      <div class="delta ok">${cr.total} verified ratings <span class="kpi-hint">↗</span></div>
+    </div>
+    <div class="card kpi clickable" id="kpi-batch" title="Click to inspect Batch A47 defect telemetry">
+      <div class="label">Of those, batch A47</div>
+      <div class="value">${pct(a.leftFromA47)}</div>
+      <div class="delta up">clustered manufacturing signal <span class="kpi-hint">↗</span></div>
+    </div>
+    <div class="card alert clickable" id="alert-a47-banner" title="Click to inspect CAPA Quality Bulletin">
       <div class="pulse"></div>
       <div>
         <div class="badge alert">POTENTIAL MANUFACTURING DEFECT</div>
@@ -204,6 +559,13 @@ function renderKpis() {
       </div>
     </div>
   `;
+
+  // Attach KPI Click Listeners
+  $("kpi-units").addEventListener("click", () => openUnitsModal());
+  $("kpi-returns").addEventListener("click", () => openReturnsModal());
+  $("kpi-reviews").addEventListener("click", () => openReviewsModal());
+  $("kpi-batch").addEventListener("click", () => openBatchA47Modal());
+  $("alert-a47-banner").addEventListener("click", () => openBatchA47Modal());
 
   $("component-bars").innerHTML = a.byComponent.map((c) => `
     <div class="bar-row"><span>${c.name}</span><div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div><span>${c.count}</span></div>

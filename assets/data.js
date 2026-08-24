@@ -125,3 +125,109 @@ function analyticsFromFleet() {
 }
 
 const ANALYTICS = analyticsFromFleet();
+
+function buildCustomerReviews() {
+  const firstNames = [
+    "Aarav", "Ananya", "Rohan", "Priya", "Vikram", "Neha", "Aditya", "Sneha", "Kunal", "Pooja",
+    "Rahul", "Divya", "Siddharth", "Meera", "Kabir", "Tanvi", "Arjun", "Kavya", "Varun", "Isha",
+    "Sarah", "Marcus", "Elena", "David", "Chloe", "Liam", "Maya", "Daniel", "Zoe", "James"
+  ];
+  const lastNames = [
+    "Sharma", "Patel", "Verma", "Mehta", "Iyer", "Nair", "Reddy", "Gupta", "Kapoor", "Chopra",
+    "Deshmukh", "Bhat", "Joshi", "Saxena", "Malhotra", "Jenkins", "Vance", "Chen", "Miller", "Taylor"
+  ];
+
+  const positiveTemplates = [
+    { title: "Incredible soundstage and punchy deep bass!", body: "These earbuds completely exceeded my expectations. The acoustic clarity and low-end bass punch are on par with headphones twice the price. Active noise cancellation is top tier.", tag: "Sound Quality" },
+    { title: "Great fit for gym and running workouts", body: "Stayed firmly in my ears during a 10k run. Sweat resistance works as advertised and the transparency mode is great for outdoor awareness.", tag: "Fit & Workout" },
+    { title: "Battery life easily lasts through whole workdays", body: "Charging case is sleek and compact. I get around 7.5 hours on a single charge with ANC enabled. Fast USB-C charging is super convenient.", tag: "Battery Life" },
+    { title: "Seamless multipoint Bluetooth pairing", body: "Switches effortlessly between my MacBook and iPhone. Call microphone quality is crisp even in noisy coffee shops.", tag: "Connectivity" },
+    { title: "Premium look and feel, very comfortable", body: "The matte finish feels luxurious. Ear tips don't cause ear fatigue even after 4 hours of continuous meetings.", tag: "Design & Comfort" },
+    { title: "Good ANC, crisp mids and highs", body: "Sound quality is 9/10 and the noise cancellation blocks train noise effectively. App controls are fast and intuitive.", tag: "Sound Quality" },
+    { title: "Solid everyday wireless earbuds", body: "Purchased these for daily commute. Case charges quickly, connectivity is instantaneous, and audio profile is rich.", tag: "General" }
+  ];
+
+  const neutralTemplates = [
+    { title: "Decent earbuds, occasional Bluetooth reconnect", body: "Audio quality is good and battery is fine, but had to re-pair once after a firmware update.", tag: "Connectivity" },
+    { title: "Good sound but case hinge feels a bit light", body: "Sound reproduction is balanced and punchy. Case lid could feel a bit sturdier for the price tag.", tag: "Build Quality" },
+    { title: "Average microphone in windy outdoor conditions", body: "Indoor voice calls are crystal clear, but outside in wind the background noise suppression can sound slightly robotic.", tag: "Mic & Calls" }
+  ];
+
+  const issueTemplates = [
+    { title: "Left earbud stopped playing audio after 3 weeks!", body: "Loved the sound initially, but out of nowhere the left earbud went completely silent. Housing is pristine and never dropped. Seems like a batch issue.", tag: "Left Earbud Issue", batch: "A47" },
+    { title: "Dead left driver — zero sound output", body: "Right earbud works fine, but left earbud has zero volume. Resetting didn't fix it. Filing a warranty return now.", tag: "Left Earbud Issue", batch: "A47" },
+    { title: "Left side died suddenly without any drop or damage", body: "Bought Batch A47. Sound cut out on the left channel yesterday. App shows it connected but driver is dead.", tag: "Left Earbud Issue", batch: "A47" },
+    { title: "Audio imbalance developed, then left went completely mute", body: "Started with low volume on left earbud and now totally silent. Right side still works. Hoping customer support replaces it quickly.", tag: "Left Earbud Issue", batch: "A47" },
+    { title: "Case wouldn't hold charge after two months", body: "Earbuds are great but the charging case led started blinking amber and won't charge overnight.", tag: "Charging Case", batch: "B12" },
+    { title: "Left driver failed after 18 days of gentle use", body: "No drops or water exposure. Left earbud driver hardware just stopped vibrating. Definite manufacturing defect.", tag: "Left Earbud Issue", batch: "A47" }
+  ];
+
+  const reviews = [];
+  for (let i = 0; i < 100; i++) {
+    const fn = firstNames[(i * 7 + 3) % firstNames.length];
+    const ln = lastNames[(i * 11 + 5) % lastNames.length];
+    const author = `${fn} ${ln.charAt(0)}.`;
+    const daysAgo = Math.floor(2 + (i * 1.7));
+    const d = new Date(Date.now() - daysAgo * 86400000);
+    const dateStr = d.toISOString().slice(0, 10);
+    const helpful = Math.floor(seeded(i * 31) * 24) + 1;
+
+    let item;
+    let rating;
+    // Distribution: 48 5-stars, 26 4-stars, 8 3-stars, 6 2-stars, 12 1-stars (Total = 100)
+    if (i < 48) {
+      rating = 5;
+      const t = positiveTemplates[i % 4];
+      item = { ...t, batch: i % 2 === 0 ? "C03" : "B12" };
+    } else if (i < 74) {
+      rating = 4;
+      const t = positiveTemplates[4 + ((i - 48) % 3)];
+      item = { ...t, batch: i % 2 === 0 ? "B12" : "C03" };
+    } else if (i < 82) {
+      rating = 3;
+      const t = neutralTemplates[(i - 74) % neutralTemplates.length];
+      item = { ...t, batch: "B12" };
+    } else if (i < 88) {
+      rating = 2;
+      const t = issueTemplates[3 + ((i - 82) % 2)];
+      item = { ...t, batch: t.batch || "A47" };
+    } else {
+      rating = 1;
+      const t = issueTemplates[(i - 88) % issueTemplates.length];
+      item = { ...t, batch: t.batch || "A47" };
+    }
+
+    reviews.push({
+      id: `REV-${1000 + i}`,
+      author,
+      rating,
+      title: item.title,
+      content: item.body,
+      tag: item.tag,
+      batch: item.batch,
+      date: dateStr,
+      verified: true,
+      helpful
+    });
+  }
+
+  const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  let totalRating = 0;
+  reviews.forEach((r) => {
+    counts[r.rating]++;
+    totalRating += r.rating;
+  });
+
+  const avg = (totalRating / reviews.length).toFixed(1);
+
+  return {
+    reviews,
+    total: reviews.length,
+    average: avg,
+    counts,
+    leftIssueCount: reviews.filter((r) => r.tag === "Left Earbud Issue").length
+  };
+}
+
+const CUSTOMER_REVIEWS = buildCustomerReviews();
+
