@@ -143,6 +143,28 @@
       </section>
     </main>
   </div>
+
+  <!-- Claim Inspection & Fulfillment Modal -->
+  <div id="claim-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <div class="badge-row">
+            <span class="mono" id="modal-claim-id" style="font-weight:700;color:var(--text)"></span>
+            <span id="modal-claim-badge" class="badge"></span>
+          </div>
+          <h3 id="modal-claim-title" style="margin:6px 0 0;font-size:18px"></h3>
+        </div>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
   <script src="assets/data.js"></script>
   <script src="assets/vision.js"></script>
   <script src="assets/arbiter.js"></script>
