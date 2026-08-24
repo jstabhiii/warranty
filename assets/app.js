@@ -815,7 +815,7 @@ function renderKpis() {
     <div class="card kpi clickable" id="kpi-units" title="Click to explore 10,000 produced units & lot catalog">
       <div class="label">Units produced</div>
       <div class="value">${a.produced.toLocaleString()}</div>
-      <div class="delta ok">PulseBuds Pro · 5 lots <span class="kpi-hint">↗</span></div>
+      <div class="delta ok">PulseBuds Pro · 3 lots <span class="kpi-hint">↗</span></div>
     </div>
     <div class="card kpi clickable" id="kpi-returns" title="Click to view all 1,143 return tickets">
       <div class="label">Returns received</div>
@@ -854,53 +854,13 @@ function renderKpis() {
   $("kpi-batch").addEventListener("click", () => openBatchA47Modal());
   $("alert-a47-banner").addEventListener("click", () => openBatchA47Modal());
 
-  // Render expanded component list
   $("component-bars").innerHTML = a.byComponent.map((c) => `
-    <div class="bar-row clickable" data-comp-id="${c.id}" title="Click to inspect ${c.name} (${c.count} returns)">
-      <span>${c.name}</span>
-      <div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div>
-      <span>${c.count}</span>
-    </div>
+    <div class="bar-row"><span>${c.name}</span><div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div><span>${c.count}</span></div>
   `).join("");
 
-  $("component-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
-    row.addEventListener("click", () => openComponentModal(row.dataset.compId));
-  });
-
-  // Render expanded batch list
   $("batch-bars").innerHTML = a.byBatch.map((b) => `
-    <div class="bar-row clickable" data-batch-id="${b.id}" title="Click to inspect Batch #${b.id} · ${b.factory} (${pct(b.rate)})">
-      <span>${b.id} · ${b.factory}</span>
-      <div class="bar"><span style="width:${Math.min(100, b.rate * 280)}%"></span></div>
-      <span>${pct(b.rate)}</span>
-    </div>
+    <div class="bar-row"><span>${b.id}</span><div class="bar"><span style="width:${Math.min(100, b.rate * 320)}%"></span></div><span>${pct(b.rate)}</span></div>
   `).join("");
-
-  $("batch-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
-    row.addEventListener("click", () => openBatchDetailModal(row.dataset.batchId));
-  });
-
-  // Attach click handler to Why this matters card
-  const whyCard = $("why-matters-card");
-  if (whyCard) {
-    whyCard.addEventListener("click", () => openWhyThisMattersModal());
-  }
-
-  const compCard = $("card-components");
-  if (compCard) {
-    compCard.addEventListener("click", (e) => {
-      if (e.target.closest(".bar-row")) return;
-      openComponentModal("left earbud");
-    });
-  }
-
-  const batchCard = $("card-batches");
-  if (batchCard) {
-    batchCard.addEventListener("click", (e) => {
-      if (e.target.closest(".bar-row")) return;
-      openBatchA47Modal();
-    });
-  }
 
   $("intel-table").innerHTML = FLEET.claims.slice(0, 8).map((c) => `
     <tr class="clickable-row" data-claim-id="${c.id}">
@@ -1057,6 +1017,68 @@ function renderDecision(unit, vision, decision) {
     <div class="step">
       <h4>Evidence chain</h4>
       <p>${decision.reasons.map((r) => `• ${r}`).join("<br>")}</p>
+    </div>
+  `;
+
+  const fulfillBtn = $("btn-arb-fulfill");
+  if (fulfillBtn) {
+    fulfillBtn.addEventListener("click", () => {
+      const rmaNumber = `RMA-${Math.floor(10000 + Math.random() * 90000)}`;
+      if (decision.action === "Replace") {
+        showToast("Replacement Dispatched", `Order #${rmaNumber} created. Brand new PulseBuds Pro assigned for ${unit.serial}.`);
+      } else if (decision.action === "Refund") {
+        showToast("Refund Dispatched", `$129.00 processed to original payment method for ${unit.serial}.`);
+      } else if (decision.action === "Repair") {
+        showToast("Repair Ticket Created", `Service order #${rmaNumber} assigned to technician queue.`);
+      } else {
+        showToast("Notice Dispatched", `Rejection reason breakdown emailed to customer.`, "warn");
+      }
+    });
+  }
+
+  const rmaBtn = $("btn-arb-rma");
+  if (rmaBtn) {
+    rmaBtn.addEventListener("click", () => {
+      showToast("Label Generated", `Prepaid return tracking slip generated for serial ${unit.serial}.`, "info");
+    });
+  }
+}
+
+async function runArbiter() {
+  const unit = lookupUnit($("serial").value);
+  if (!unit) {
+    $("result-panel").innerHTML = `<div class="decision reject"><h3>Serial not found</h3><p>Use a catalog serial so purchase history and batch can be joined.</p></div>`;
+    return;
+  }
+  $("result-panel").innerHTML = `<div class="step"><h4>Analyzing</h4><p>Running on-device vision and policy engine…</p></div>`;
+  const vision = await analyzeEvidence(state.file, $("symptom").value);
+  const decision = decideClaim({
+    unit,
+    vision,
+    symptom: $("symptom").value,
+    customerAsk: $("ask").value
+  });
+  renderDecision(unit, vision, decision);
+}
+
+async function playDemo(which) {
+  setView("intake");
+  if (which === "a47") {
+    $("serial").value = "PB-A47-01041";
+    $("ask").value = "replace";
+    $("notes").value = "Left bud died. I didn't drop them.";
+    onSerial();
+    await generate("mfg-left");
+  } else {
+    $("serial").value = "PB-B12-03210";
+    $("ask").value = "refund";
+    $("notes").value = "I sat on them. The left side is cracked.";
+    onSerial();
+    await generate("physical");
+  }
+  await runArbiter();
+}
+
 // Full Dedicated Reviews View
 function renderFullReviewsView(starFilter = "all", searchQuery = "") {
   const container = $("reviews-full-container");

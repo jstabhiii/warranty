@@ -17,24 +17,10 @@ function seeded(n) {
 
 function buildFleet() {
   const batches = [
-    { id: "A47", units: 2200, defectRate: 0.34, laterality: "left", factory: "Shenzhen Line 2", lotDate: "Mar 2026", note: "Critical Left Driver Solder Fatigue", status: "Stop-Ship Active" },
-    { id: "A48", units: 1800, defectRate: 0.16, laterality: "left", factory: "Shenzhen Line 2", lotDate: "Apr 2026", note: "Moderate Driver Solder Spillover", status: "Under Monitoring" },
-    { id: "B12", units: 2400, defectRate: 0.058, laterality: "right", factory: "Dongguan Line 1", lotDate: "Jan 2025", note: "Nominal Baseline Performance", status: "Normal Yield" },
-    { id: "B14", units: 1700, defectRate: 0.052, laterality: "both", factory: "Dongguan Line 1", lotDate: "Feb 2025", note: "Nominal Baseline Performance", status: "Normal Yield" },
-    { id: "C03", units: 1900, defectRate: 0.042, laterality: "both", factory: "Hai Phong Line 4", lotDate: "Aug 2026", note: "Top Reliability / Golden Sample Lot", status: "Golden Lot" }
+    { id: "A47", units: 2200, defectRate: 0.32, laterality: "left" },
+    { id: "B12", units: 4100, defectRate: 0.058, laterality: "right" },
+    { id: "C03", units: 3700, defectRate: 0.048, laterality: "both" }
   ];
-
-  const componentsCatalog = [
-    { id: "left earbud", name: "Left Earbud (Driver)", defaultReason: "No audio / driver dead", rootCause: "Solder fatigue at voice coil lead termination under thermal cycle." },
-    { id: "right earbud", name: "Right Earbud (Driver)", defaultReason: "Driver distortion / mute", rootCause: "Mechanical diaphragm misalignment from drop impact." },
-    { id: "charging case", name: "Charging Case (Power)", defaultReason: "Case not charging / dead battery", rootCause: "PMIC over-discharge protection latch-up." },
-    { id: "anc microphone", name: "ANC Microphone Array", defaultReason: "Hissing noise / ANC oscillation", rootCause: "Feedforward MEMS microphone membrane contamination." },
-    { id: "touch sensor", name: "Touch Sensor Stem", defaultReason: "Unresponsive touch / phantom taps", rootCause: "Capacitive ITO flex trace micro-fracture." },
-    { id: "pogo pin contacts", name: "Pogo Pin Contacts", defaultReason: "Earbud won't connect in cradle", rootCause: "Surface plating oxidation / spring fatigue." },
-    { id: "bluetooth antenna", name: "Bluetooth 5.3 RF Module", defaultReason: "Intermittent audio drops / range < 2m", rootCause: "Ceramic chip antenna impedance mismatch." },
-    { id: "silicone seal", name: "IPX5 Ingress Seal", defaultReason: "Moisture ingress after sweat exposure", rootCause: "Acoustic mesh adhesive delamination." }
-  ];
-
   const units = [];
   const claims = [];
   let serial = 1000;
@@ -57,33 +43,20 @@ function buildFleet() {
 
       const returned = seeded(i + 7) < batch.defectRate;
       if (returned) {
-        let compObj;
-        if (batch.id === "A47") {
-          compObj = seeded(i + 3) < 0.88 ? componentsCatalog[0] : componentsCatalog[1 + Math.floor(seeded(i + 13) * 7)];
-        } else if (batch.id === "A48") {
-          compObj = seeded(i + 3) < 0.60 ? componentsCatalog[0] : componentsCatalog[1 + Math.floor(seeded(i + 13) * 7)];
-        } else {
-          compObj = componentsCatalog[Math.floor(seeded(i + 13) * componentsCatalog.length)];
-        }
-
-        const reason = compObj.defaultReason;
-        const decision = (batch.id === "A47" || batch.id === "A48") && compObj.id === "left earbud"
-          ? "Replace"
-          : compObj.id === "charging case"
-            ? "Replace"
-            : compObj.id.includes("earbud")
-              ? "Repair"
-              : "Repair";
-
+        const leftBias = batch.id === "A47" ? 0.91 : 0.12;
+        const component = seeded(i + 3) < leftBias ? "left earbud" : (seeded(i + 11) < 0.5 ? "right earbud" : "charging case");
+        const reason = component.includes("earbud") && batch.id === "A47"
+          ? "No audio / driver dead"
+          : component === "charging case"
+            ? "Case not charging"
+            : "Intermittent disconnect";
         claims.push({
           id: `CLM-${10000 + claims.length}`,
           serial: s,
           batch: batch.id,
-          component: compObj.id,
-          componentName: compObj.name,
+          component,
           reason,
-          decision,
-          rootCause: compObj.rootCause,
+          decision: batch.id === "A47" ? "Replace" : "Repair",
           createdAt: new Date(purchased.getTime() + (10 + seeded(i) * 40) * 86400000).toISOString().slice(0, 10)
         });
         unit.priorClaims = 1;
@@ -126,7 +99,7 @@ function buildFleet() {
     else units.push(u);
   });
 
-  return { units, claims, batches, componentsCatalog };
+  return { units, claims, batches };
 }
 
 const FLEET = buildFleet();
@@ -142,28 +115,12 @@ function analyticsFromFleet() {
     leftFromA47: leftA47.length / left.length,
     byBatch: FLEET.batches.map((b) => {
       const count = returns.filter((c) => c.batch === b.id).length;
-      return {
-        id: b.id,
-        units: b.units,
-        returns: count,
-        rate: count / b.units,
-        factory: b.factory,
-        lotDate: b.lotDate,
-        note: b.note,
-        status: b.status
-      };
+      return { id: b.id, units: b.units, returns: count, rate: count / b.units };
     }),
-    byComponent: FLEET.componentsCatalog.map((comp) => {
-      const count = returns.filter((c) => c.component === comp.id).length;
-      return {
-        id: comp.id,
-        name: comp.name,
-        count,
-        rate: count / returns.length,
-        rootCause: comp.rootCause,
-        defaultReason: comp.defaultReason
-      };
-    })
+    byComponent: ["left earbud", "right earbud", "charging case"].map((name) => ({
+      name,
+      count: returns.filter((c) => c.component === name).length
+    }))
   };
 }
 
