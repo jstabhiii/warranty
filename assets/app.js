@@ -815,7 +815,7 @@ function renderKpis() {
     <div class="card kpi clickable" id="kpi-units" title="Click to explore 10,000 produced units & lot catalog">
       <div class="label">Units produced</div>
       <div class="value">${a.produced.toLocaleString()}</div>
-      <div class="delta ok">PulseBuds Pro · 3 lots <span class="kpi-hint">↗</span></div>
+      <div class="delta ok">PulseBuds Pro · 5 lots <span class="kpi-hint">↗</span></div>
     </div>
     <div class="card kpi clickable" id="kpi-returns" title="Click to view all 1,143 return tickets">
       <div class="label">Returns received</div>
@@ -854,13 +854,53 @@ function renderKpis() {
   $("kpi-batch").addEventListener("click", () => openBatchA47Modal());
   $("alert-a47-banner").addEventListener("click", () => openBatchA47Modal());
 
+  // Render expanded component list with interactive click handler
   $("component-bars").innerHTML = a.byComponent.map((c) => `
-    <div class="bar-row"><span>${c.name}</span><div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div><span>${c.count}</span></div>
+    <div class="bar-row clickable" data-comp-id="${c.id}" title="Click to inspect ${c.name} (${c.count} returns)">
+      <span>${c.name}</span>
+      <div class="bar"><span style="width:${(c.count / a.returns) * 100}%"></span></div>
+      <span>${c.count}</span>
+    </div>
   `).join("");
 
+  $("component-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
+    row.addEventListener("click", () => openComponentModal(row.dataset.compId));
+  });
+
+  // Render expanded batch list with interactive click handler
   $("batch-bars").innerHTML = a.byBatch.map((b) => `
-    <div class="bar-row"><span>${b.id}</span><div class="bar"><span style="width:${Math.min(100, b.rate * 320)}%"></span></div><span>${pct(b.rate)}</span></div>
+    <div class="bar-row clickable" data-batch-id="${b.id}" title="Click to inspect Batch #${b.id} · ${b.factory} (${pct(b.rate)})">
+      <span>${b.id} · ${b.factory}</span>
+      <div class="bar"><span style="width:${Math.min(100, b.rate * 280)}%"></span></div>
+      <span>${pct(b.rate)}</span>
+    </div>
   `).join("");
+
+  $("batch-bars").querySelectorAll(".bar-row.clickable").forEach((row) => {
+    row.addEventListener("click", () => openBatchDetailModal(row.dataset.batchId));
+  });
+
+  // Attach click handler to Why this matters card
+  const whyCard = $("why-matters-card");
+  if (whyCard) {
+    whyCard.addEventListener("click", () => openWhyThisMattersModal());
+  }
+
+  const compCard = $("card-components");
+  if (compCard) {
+    compCard.addEventListener("click", (e) => {
+      if (e.target.closest(".bar-row")) return;
+      openComponentModal("left earbud");
+    });
+  }
+
+  const batchCard = $("card-batches");
+  if (batchCard) {
+    batchCard.addEventListener("click", (e) => {
+      if (e.target.closest(".bar-row")) return;
+      openBatchA47Modal();
+    });
+  }
 
   $("intel-table").innerHTML = FLEET.claims.slice(0, 8).map((c) => `
     <tr class="clickable-row" data-claim-id="${c.id}">

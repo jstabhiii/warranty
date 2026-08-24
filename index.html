@@ -132,20 +132,33 @@
 
         <div class="grid-4" id="kpis"></div>
         <div class="grid-3" style="margin-top:14px">
-          <div class="card">
-            <div class="label muted">Returns by component</div>
+          <div class="card" id="card-components">
+            <div class="label muted" style="display:flex;justify-content:space-between;align-items:center">
+              <span>Returns by component</span>
+              <span class="kpi-hint" style="font-size:11px;color:var(--orange)">8 Subsystems ↗</span>
+            </div>
             <div class="bars" id="component-bars"></div>
           </div>
-          <div class="card">
-            <div class="label muted">Batch return rate</div>
+          <div class="card" id="card-batches">
+            <div class="label muted" style="display:flex;justify-content:space-between;align-items:center">
+              <span>Batch return rate</span>
+              <span class="kpi-hint" style="font-size:11px;color:var(--orange)">5 Lots ↗</span>
+            </div>
             <div class="bars" id="batch-bars"></div>
           </div>
-          <div class="card">
-            <div class="label muted">Why this matters</div>
-            <p class="muted" style="line-height:1.5;font-size:13px">
+          <div class="card clickable" id="why-matters-card" title="Click to view Financial Impact & Recall ROI Modeling">
+            <div class="label muted" style="display:flex;justify-content:space-between;align-items:center">
+              <span>Why this matters</span>
+              <span class="kpi-hint">↗</span>
+            </div>
+            <p class="muted" style="line-height:1.5;font-size:13px;margin:8px 0 10px">
               Processing a return is cheap. Recalling the wrong batch — or missing a real one — is not.
               Indi Arbiter ties each claim’s photo, serial, and symptom back to the factory lot.
             </p>
+            <div style="font-size:12px;font-weight:700;color:var(--orange);display:flex;align-items:center;gap:4px">
+              <span>📊 Open Financial ROI Model</span>
+              <span class="kpi-hint">↗</span>
+            </div>
           </div>
         </div>
         <div class="card" style="margin-top:14px">
