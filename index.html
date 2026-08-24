@@ -12,7 +12,7 @@
 <body>
   <div class="app">
     <aside class="sidebar">
-      <div class="brand">
+      <div class="brand" id="brand-logo-btn" title="Indi Arbiter Home">
         <div class="logo">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <!-- Interior Base Depth -->
@@ -40,17 +40,84 @@
           <p>Warranty · Returns · Fleet risk</p>
         </div>
       </div>
-      <button class="nav-btn active" data-view="intel">Fleet intelligence</button>
-      <button class="nav-btn" data-view="intake">New claim</button>
-      <button class="nav-btn" data-view="history">Claim history</button>
-      <div class="sidebar-foot">
-        Demo catalog: 10,000 PulseBuds Pro<br />
-        Vision runs on-device in the browser.<br />
-        No backend required.
+
+      <!-- Sidebar Quick Search -->
+      <div class="sidebar-search">
+        <span class="search-icon">🔍</span>
+        <input id="sidebar-serial-input" placeholder="Quick serial check (PB-A47...)" />
+      </div>
+
+      <!-- Navigation Menu -->
+      <div class="sidebar-section-label">Operations Modules</div>
+      <button class="nav-btn active" data-view="intel">
+        <span class="nav-icon">📊</span>
+        <span>Fleet intelligence</span>
+      </button>
+      <button class="nav-btn" data-view="intake">
+        <span class="nav-icon">⚡</span>
+        <span>New claim intake</span>
+      </button>
+      <button class="nav-btn" data-view="history">
+        <span class="nav-icon">📜</span>
+        <span>Claim history</span>
+        <span class="nav-badge" id="sidebar-claims-count">1.1k</span>
+      </button>
+      <button class="nav-btn" data-view="reviews">
+        <span class="nav-icon">⭐</span>
+        <span>Customer reviews</span>
+        <span class="nav-badge">4.1★</span>
+      </button>
+      <button class="nav-btn" data-view="lots">
+        <span class="nav-icon">📦</span>
+        <span>Batch lots & stock</span>
+        <span class="nav-badge">5 Lots</span>
+      </button>
+      <button class="nav-btn" data-view="policy">
+        <span class="nav-icon">⚖️</span>
+        <span>Policy rules engine</span>
+      </button>
+
+      <!-- Quick Automation Actions -->
+      <div class="sidebar-section-label">Quick Actions</div>
+      <div class="sidebar-quick-actions">
+        <button class="sidebar-action-btn" id="sidebar-btn-a47">
+          <span>⚡</span>
+          <span>Demo: A47 Left Defect</span>
+        </button>
+        <button class="sidebar-action-btn" id="sidebar-btn-damage">
+          <span>💥</span>
+          <span>Demo: Physical Crack</span>
+        </button>
+        <button class="sidebar-action-btn" id="sidebar-btn-export">
+          <span>📥</span>
+          <span>Export Claims (CSV)</span>
+        </button>
+      </div>
+
+      <!-- System Status Indicator -->
+      <div class="sidebar-status">
+        <div class="status-dot"></div>
+        <span>Vision Engine: On-Device (Active)</span>
+      </div>
+
+      <!-- User Profile & Authentication Card -->
+      <div class="sidebar-user-container">
+        <div class="sidebar-user-card" id="sidebar-user-card" title="Click to manage account / switch session">
+          <div class="user-avatar-wrap">
+            <div class="user-avatar" id="sidebar-user-avatar">SS</div>
+            <div class="user-avatar-dot" id="sidebar-user-dot"></div>
+          </div>
+          <div class="user-info">
+            <div class="user-name" id="sidebar-user-name">Suyash Sharma</div>
+            <div class="user-role" id="sidebar-user-role">Operations Admin</div>
+          </div>
+          <button class="user-auth-btn" id="sidebar-auth-btn">Log out</button>
+        </div>
       </div>
     </aside>
 
     <main class="main">
+      <!-- 1. FLEET INTELLIGENCE VIEW -->
       <section id="view-intel">
         <div class="topbar">
           <div>
@@ -105,6 +172,7 @@
         </div>
       </section>
 
+      <!-- 2. RETURN INTAKE VIEW -->
       <section id="view-intake" class="hidden">
         <div class="topbar">
           <div>
@@ -161,11 +229,15 @@
         </div>
       </section>
 
+      <!-- 3. CLAIM HISTORY VIEW -->
       <section id="view-history" class="hidden">
         <div class="topbar">
           <div>
             <h2>Claim history</h2>
             <p>Seeded from the 10,000-unit PulseBuds Pro production run. Filter by the live search box.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" id="btn-export-history">📥 Download CSV</button>
           </div>
         </div>
         <div class="card">
@@ -176,6 +248,121 @@
             </thead>
             <tbody id="hist-table"></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- 4. CUSTOMER REVIEWS VIEW (DEDICATED) -->
+      <section id="view-reviews" class="hidden">
+        <div class="topbar">
+          <div>
+            <h2>Customer Reviews & Sentiment</h2>
+            <p>Aggregate voice-of-customer intelligence across 100 verified purchasers and warranty claimants.</p>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="btn-reviews-a47-demo">⚡ Cross-Reference A47 in Arbiter</button>
+          </div>
+        </div>
+        <div id="reviews-full-container"></div>
+      </section>
+
+      <!-- 5. BATCH LOTS & INVENTORY VIEW -->
+      <section id="view-lots" class="hidden">
+        <div class="topbar">
+          <div>
+            <h2>Batch Lots & Inventory Explorer</h2>
+            <p>Monitor factory lines, lot yields, and manage warehouse stop-ship quarantine orders in real-time.</p>
+          </div>
+        </div>
+        <div class="grid-3" id="lots-cards-container"></div>
+        <div class="card" style="margin-top:16px">
+          <div class="label muted" style="margin-bottom:10px">10,000-Unit Production Lot Explorer</div>
+          <input id="lots-unit-search" placeholder="Search 10,000 unit serials by lot (e.g. PB-A47, PB-B12, PB-C03)..." style="width:100%;margin-bottom:14px;background:#ffffff;border:1px solid rgba(200, 145, 95, 0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none" />
+          <table>
+            <thead>
+              <tr><th>Serial</th><th>Batch</th><th>Factory</th><th>Purchased</th><th>Channel</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody id="lots-unit-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. POLICY RULES ENGINE VIEW -->
+      <section id="view-policy" class="hidden">
+        <div class="topbar">
+          <div>
+            <h2>Policy Rules Engine</h2>
+            <p>Configure automated arbitration rules, warranty entitlement parameters, and defect cluster auto-approvals.</p>
+          </div>
+          <div class="actions">
+            <button class="btn primary" id="btn-save-policy">💾 Save Policy Configuration</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <h3 style="margin:0 0 16px;font-size:16px">Automated Adjudication Directives</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div class="toggle-row">
+                <div>
+                  <div style="font-weight:700;font-size:13px">Batch A47 Left-Driver Auto-Replace</div>
+                  <div class="muted" style="font-size:12px">Auto-approve zero-cost replacement without manual RMA inspection</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="policy-toggle-a47" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div style="font-weight:700;font-size:13px">Physical Impact Crack Strict Reject</div>
+                  <div class="muted" style="font-size:12px">Automatically reject user drop fractures with reason breakdown</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="policy-toggle-crack" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div style="font-weight:700;font-size:13px">DOA Full-Refund Guarantee</div>
+                  <div class="muted" style="font-size:12px">Grant immediate cash refund if failure occurs within return window</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="policy-toggle-doa" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="toggle-row">
+                <div>
+                  <div style="font-weight:700;font-size:13px">On-Device Computer Vision Pre-Check</div>
+                  <div class="muted" style="font-size:12px">Classify shell fractures and laterality locally in user's browser</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="policy-toggle-vision" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 style="margin:0 0 16px;font-size:16px">Warranty Windows & Entitlements</h3>
+            <div class="field">
+              <label>Standard Manufacturer Warranty Duration (Days)</label>
+              <input id="policy-warranty-days" type="number" value="365" />
+            </div>
+            <div class="field">
+              <label>Dead-On-Arrival (DOA) Refund Window (Days)</label>
+              <input id="policy-doa-days" type="number" value="14" />
+            </div>
+            <div class="field">
+              <label>Manufacturing Cluster Escalation Threshold (%)</label>
+              <input id="policy-cluster-threshold" type="number" value="15" />
+            </div>
+            <div class="step" style="background:#faf6f1;margin-top:14px">
+              <h4>Policy Version: v2.4.0 (Active)</h4>
+              <p style="font-size:12px;margin:4px 0 0">All intake claims evaluate deterministically against these thresholds.</p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -196,6 +383,24 @@
       </div>
       <div class="modal-body" id="modal-body"></div>
       <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <!-- Authentication & User Profile Modal -->
+  <div id="auth-modal" class="modal-overlay hidden">
+    <div class="modal-card" style="max-width:480px">
+      <div class="modal-header">
+        <div>
+          <div class="badge-row">
+            <span class="mono" style="font-weight:700;color:var(--text)">INDI ARBITER AUTHENTICATION</span>
+            <span id="auth-modal-badge" class="badge ok">Operations Portal</span>
+          </div>
+          <h3 id="auth-modal-title" style="margin:6px 0 0;font-size:18px">User Account & Session</h3>
+        </div>
+        <button class="modal-close" id="auth-modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" id="auth-modal-body"></div>
+      <div class="modal-actions" id="auth-modal-actions"></div>
     </div>
   </div>
 

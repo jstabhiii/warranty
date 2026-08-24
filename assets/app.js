@@ -3,6 +3,17 @@ const state = {
   preview: null
 };
 
+const authState = {
+  isLoggedIn: true,
+  user: {
+    name: "Suyash Sharma",
+    email: "suyash@indi-arbiter.io",
+    role: "Operations Admin",
+    avatar: "SS",
+    token: "ARB-AUTH-88421"
+  }
+};
+
 function $(id) { return document.getElementById(id); }
 
 function pct(n) { return `${(n * 100).toFixed(0)}%`; }
@@ -12,6 +23,26 @@ function setView(name) {
   $("view-intel").classList.toggle("hidden", name !== "intel");
   $("view-intake").classList.toggle("hidden", name !== "intake");
   $("view-history").classList.toggle("hidden", name !== "history");
+  
+  const viewReviews = $("view-reviews");
+  if (viewReviews) {
+    viewReviews.classList.toggle("hidden", name !== "reviews");
+    if (name === "reviews") renderFullReviewsView();
+  }
+
+  const viewLots = $("view-lots");
+  if (viewLots) {
+    viewLots.classList.toggle("hidden", name !== "lots");
+    if (name === "lots") renderLotsView();
+  }
+
+  const viewPolicy = $("view-policy");
+  if (viewPolicy) {
+    viewPolicy.classList.toggle("hidden", name !== "policy");
+    if (name === "policy") renderPolicyView();
+  }
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function showToast(title, desc, type = "success") {
@@ -1026,69 +1057,468 @@ function renderDecision(unit, vision, decision) {
     <div class="step">
       <h4>Evidence chain</h4>
       <p>${decision.reasons.map((r) => `• ${r}`).join("<br>")}</p>
+// Full Dedicated Reviews View
+function renderFullReviewsView(starFilter = "all", searchQuery = "") {
+  const container = $("reviews-full-container");
+  if (!container) return;
+  const cr = CUSTOMER_REVIEWS;
+  const q = searchQuery.toLowerCase().trim();
+
+  const filtered = cr.reviews.filter((r) => {
+    let matchStar = true;
+    if (starFilter === "5") matchStar = r.rating === 5;
+    else if (starFilter === "4") matchStar = r.rating === 4;
+    else if (starFilter === "3") matchStar = r.rating === 3;
+    else if (starFilter === "2") matchStar = r.rating === 2;
+    else if (starFilter === "1") matchStar = r.rating === 1;
+    else if (starFilter === "issue") matchStar = r.tag === "Left Earbud Issue";
+
+    const matchQuery = !q || 
+      r.author.toLowerCase().includes(q) || 
+      r.title.toLowerCase().includes(q) || 
+      r.content.toLowerCase().includes(q) || 
+      r.tag.toLowerCase().includes(q) ||
+      (r.batch && r.batch.toLowerCase().includes(q));
+
+    return matchStar && matchQuery;
+  });
+
+  const renderStars = (n) => "★".repeat(n) + "☆".repeat(5 - n);
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:16px">
+      <div class="reviews-summary-grid" style="background:transparent;border:none;padding:0">
+        <div class="score-box" style="border-right:1px solid var(--line-light)">
+          <div class="big-score">${cr.average}</div>
+          <div class="stars-row">${renderStars(4)}</div>
+          <div class="score-subtitle">100 Verified Purchases</div>
+          <div style="margin-top:8px">
+            <span class="badge alert" style="font-size:10.5px;padding:3px 8px">⚠️ 18% reported left-driver failure (Lot A47)</span>
+          </div>
+        </div>
+        <div class="star-bars">
+          ${[5, 4, 3, 2, 1].map((s) => `
+            <div class="star-bar-row">
+              <span>${s} ★</span>
+              <div class="star-bar">
+                <div class="star-bar-fill" style="width:${(cr.counts[s] / cr.total) * 100}%"></div>
+              </div>
+              <span style="text-align:right">${cr.counts[s]}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="reviews-filter-bar" style="margin-bottom:14px">
+        <input id="full-review-search" value="${searchQuery}" placeholder="Search 100 customer reviews by keyword, name, or lot (e.g. 'bass', 'A47', 'drop', 'battery')..." style="background:#ffffff;border:1px solid rgba(200,145,95,0.28);border-radius:10px;padding:10px 14px;color:var(--text);outline:none;font-size:13px;width:100%" />
+        <div class="review-filter-chips">
+          <button class="review-filter-chip ${starFilter === "all" ? "active" : ""}" data-full-filter="all">All (${cr.total})</button>
+          <button class="review-filter-chip ${starFilter === "5" ? "active" : ""}" data-full-filter="5">5 ★ (${cr.counts[5]})</button>
+          <button class="review-filter-chip ${starFilter === "4" ? "active" : ""}" data-full-filter="4">4 ★ (${cr.counts[4]})</button>
+          <button class="review-filter-chip ${starFilter === "3" ? "active" : ""}" data-full-filter="3">3 ★ (${cr.counts[3]})</button>
+          <button class="review-filter-chip ${starFilter === "2" ? "active" : ""}" data-full-filter="2">2 ★ (${cr.counts[2]})</button>
+          <button class="review-filter-chip ${starFilter === "1" ? "active" : ""}" data-full-filter="1">1 ★ (${cr.counts[1]})</button>
+          <button class="review-filter-chip ${starFilter === "issue" ? "active" : ""}" data-full-filter="issue" style="color:#ea580c;border-color:rgba(255,102,0,0.3)">⚠️ Left Earbud Defect (${cr.leftIssueCount})</button>
+        </div>
+      </div>
+
+      <div class="reviews-list" style="max-height:60vh">
+        ${filtered.length === 0 ? `
+          <div style="text-align:center;padding:32px;color:var(--muted)">No customer reviews found matching your search.</div>
+        ` : filtered.map((r) => `
+          <div class="review-card">
+            <div class="review-header">
+              <div class="review-author-info">
+                <div class="review-avatar">${r.author.charAt(0)}</div>
+                <span class="review-author-name">${r.author}</span>
+                <span class="verified-tag">✓ Verified Purchaser</span>
+              </div>
+              <div class="review-meta-right">
+                <span class="review-stars">${renderStars(r.rating)}</span>
+                <span class="review-date">${r.date}</span>
+                ${r.batch ? `<span class="badge replace" style="font-size:10px;padding:2px 6px">Lot #${r.batch}</span>` : ""}
+              </div>
+            </div>
+            <div class="review-title">${r.title}</div>
+            <div class="review-body">${r.content}</div>
+            <div class="review-footer">
+              <span class="review-tag ${r.tag === "Left Earbud Issue" ? "issue" : ""}">${r.tag}</span>
+              <button class="review-helpful-btn" onclick="this.textContent = '👍 Helpful (' + (${r.helpful} + 1) + ')'; this.disabled = true;">👍 Helpful (${r.helpful})</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
     </div>
   `;
 
-  const fulfillBtn = $("btn-arb-fulfill");
-  if (fulfillBtn) {
-    fulfillBtn.addEventListener("click", () => {
-      const rmaNumber = `RMA-${Math.floor(10000 + Math.random() * 90000)}`;
-      if (decision.action === "Replace") {
-        showToast("Replacement Dispatched", `Order #${rmaNumber} created. Brand new PulseBuds Pro assigned for ${unit.serial}.`);
-      } else if (decision.action === "Refund") {
-        showToast("Refund Dispatched", `$129.00 processed to original payment method for ${unit.serial}.`);
-      } else if (decision.action === "Repair") {
-        showToast("Repair Ticket Created", `Service order #${rmaNumber} assigned to technician queue.`);
-      } else {
-        showToast("Notice Dispatched", `Rejection reason breakdown emailed to customer.`, "warn");
-      }
+  // Attach search & filter handlers
+  const searchInput = $("full-review-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      renderFullReviewsView(starFilter, e.target.value);
     });
   }
 
-  const rmaBtn = $("btn-arb-rma");
-  if (rmaBtn) {
-    rmaBtn.addEventListener("click", () => {
-      showToast("Label Generated", `Prepaid return tracking slip generated for serial ${unit.serial}.`, "info");
+  container.querySelectorAll("[data-full-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      renderFullReviewsView(btn.dataset.fullFilter, searchInput ? searchInput.value : "");
     });
-  }
-}
-
-async function runArbiter() {
-  const unit = lookupUnit($("serial").value);
-  if (!unit) {
-    $("result-panel").innerHTML = `<div class="decision reject"><h3>Serial not found</h3><p>Use a catalog serial so purchase history and batch can be joined.</p></div>`;
-    return;
-  }
-  $("result-panel").innerHTML = `<div class="step"><h4>Analyzing</h4><p>Running on-device vision and policy engine…</p></div>`;
-  const vision = await analyzeEvidence(state.file, $("symptom").value);
-  const decision = decideClaim({
-    unit,
-    vision,
-    symptom: $("symptom").value,
-    customerAsk: $("ask").value
   });
-  renderDecision(unit, vision, decision);
-}
 
-async function playDemo(which) {
-  setView("intake");
-  if (which === "a47") {
-    $("serial").value = "PB-A47-01041";
-    $("ask").value = "replace";
-    $("notes").value = "Left bud died. I didn't drop them.";
-    onSerial();
-    await generate("mfg-left");
-  } else {
-    $("serial").value = "PB-B12-03210";
-    $("ask").value = "refund";
-    $("notes").value = "I sat on them. The left side is cracked.";
-    onSerial();
-    await generate("physical");
+  const a47DemoBtn = $("btn-reviews-a47-demo");
+  if (a47DemoBtn) {
+    a47DemoBtn.addEventListener("click", () => playDemo("a47"));
   }
-  await runArbiter();
 }
 
-// Event Listeners
+// Dedicated Batch Lots & Inventory View
+function renderLotsView(searchQuery = "") {
+  const container = $("lots-cards-container");
+  const tableBody = $("lots-unit-table");
+  if (!container || !tableBody) return;
+
+  const batches = ANALYTICS.byBatch;
+  container.innerHTML = batches.map((b) => `
+    <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div class="label muted">Batch #${b.id}</div>
+            <h3 style="margin:4px 0 2px;font-size:18px">${b.factory}</h3>
+            <div class="muted" style="font-size:12px">${b.lotDate}</div>
+          </div>
+          <span class="badge ${b.id === "A47" || b.id === "A48" ? "alert" : "ok"}">${b.status}</span>
+        </div>
+        <div class="meta-grid" style="margin-top:14px">
+          <div class="meta-item">
+            <div class="meta-label">Produced</div>
+            <div class="meta-val mono">${b.units.toLocaleString()}</div>
+          </div>
+          <div class="meta-item">
+            <div class="meta-label">Return Rate</div>
+            <div class="meta-val" style="color:${b.rate > 0.1 ? "var(--red)" : "var(--ok)"}">${pct(b.rate)} (${b.returns})</div>
+          </div>
+        </div>
+        <p class="muted" style="font-size:12px;margin:10px 0 0;line-height:1.4">${b.note}</p>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn primary" style="flex:1;font-size:12px;padding:7px" data-lot-inspect="${b.id}">🔍 Filter Serials</button>
+        <button class="btn" style="font-size:12px;padding:7px" onclick="showToast('Stop-Ship Toggled', 'Quarantine policy updated for Lot #${b.id}.', 'info')">${b.id === 'A47' ? 'Quarantined' : 'Quarantine'}</button>
+      </div>
+    </div>
+  `).join("");
+
+  container.querySelectorAll("[data-lot-inspect]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $("lots-unit-search").value = `PB-${btn.dataset.lotInspect}`;
+      renderLotsView(`PB-${btn.dataset.lotInspect}`);
+    });
+  });
+
+  const q = searchQuery.toLowerCase().trim();
+  const filteredUnits = FLEET.units.filter((u) => !q || u.serial.toLowerCase().includes(q) || u.batch.toLowerCase().includes(q) || u.channel.toLowerCase().includes(q)).slice(0, 30);
+
+  tableBody.innerHTML = filteredUnits.map((u) => {
+    const batchObj = batches.find((b) => b.id === u.batch);
+    return `
+      <tr>
+        <td class="mono" style="font-weight:700">${u.serial}</td>
+        <td><span class="badge ${u.batch === 'A47' ? 'alert' : 'replace'}">${u.batch}</span></td>
+        <td>${batchObj ? batchObj.factory : 'Facility 1'}</td>
+        <td>${u.purchasedAt}</td>
+        <td>${u.channel}</td>
+        <td><span class="badge ${u.priorClaims > 0 ? 'refund' : 'ok'}">${u.priorClaims > 0 ? 'Returned' : 'In Field'}</span></td>
+        <td><button class="badge replace" data-lot-unit="${u.serial}">Load Intake ↗</button></td>
+      </tr>
+    `;
+  }).join("");
+
+  tableBody.querySelectorAll("[data-lot-unit]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setView("intake");
+      $("serial").value = btn.dataset.lotUnit;
+      onSerial();
+      generate(btn.dataset.lotUnit.includes("A47") ? "mfg-left" : "physical");
+    });
+  });
+
+  const searchInput = $("lots-unit-search");
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.dataset.bound = "true";
+    searchInput.addEventListener("input", (e) => {
+      renderLotsView(e.target.value);
+    });
+  }
+}
+
+// Dedicated Policy View
+function renderPolicyView() {
+  const saveBtn = $("btn-save-policy");
+  if (saveBtn && !saveBtn.dataset.bound) {
+    saveBtn.dataset.bound = "true";
+    saveBtn.addEventListener("click", () => {
+      const a47Active = $("policy-toggle-a47").checked;
+      const crackReject = $("policy-toggle-crack").checked;
+      const doaActive = $("policy-toggle-doa").checked;
+      const warrantyDays = $("policy-warranty-days").value;
+      const doaDays = $("policy-doa-days").value;
+
+      showToast("Policy Engine Configured", `Saved Active Rules: Warranty ${warrantyDays}d, DOA ${doaDays}d, A47 Auto-Replace ${a47Active ? 'Enabled' : 'Disabled'}, Crack Reject ${crackReject ? 'Active' : 'Bypassed'}.`, "success");
+    });
+  }
+}
+
+// User Authentication Logic
+function renderAuthUI() {
+  const avatarEl = $("sidebar-user-avatar");
+  const nameEl = $("sidebar-user-name");
+  const roleEl = $("sidebar-user-role");
+  const authBtn = $("sidebar-auth-btn");
+  const dotEl = $("sidebar-user-dot");
+
+  if (!avatarEl || !nameEl || !roleEl || !authBtn) return;
+
+  if (authState.isLoggedIn) {
+    avatarEl.textContent = authState.user.avatar || "SS";
+    avatarEl.classList.remove("guest");
+    nameEl.textContent = authState.user.name;
+    roleEl.textContent = authState.user.role;
+    authBtn.textContent = "Log out";
+    if (dotEl) dotEl.style.display = "block";
+  } else {
+    avatarEl.textContent = "GU";
+    avatarEl.classList.add("guest");
+    nameEl.textContent = "Guest User";
+    roleEl.textContent = "Read-Only Access";
+    authBtn.textContent = "Log in";
+    if (dotEl) dotEl.style.display = "none";
+  }
+}
+
+function openAuthModal() {
+  const modal = $("auth-modal");
+  const body = $("auth-modal-body");
+  const actions = $("auth-modal-actions");
+  const title = $("auth-modal-title");
+  const badge = $("auth-modal-badge");
+  if (!modal || !body || !actions) return;
+
+  if (authState.isLoggedIn) {
+    title.textContent = "Active Session & Profile";
+    badge.className = "badge ok";
+    badge.textContent = "Authenticated";
+
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;padding:14px;background:#faf6f1;border-radius:14px;border:1px solid var(--line-light)">
+        <div class="user-avatar" style="width:48px;height:48px;font-size:16px">${authState.user.avatar}</div>
+        <div>
+          <div style="font-weight:800;font-size:16px;color:var(--text)">${authState.user.name}</div>
+          <div class="muted" style="font-size:13px">${authState.user.email}</div>
+          <div style="margin-top:4px"><span class="badge replace">${authState.user.role}</span></div>
+        </div>
+      </div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Session ID</div>
+          <div class="meta-val mono" style="font-size:12px">${authState.user.token}</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">Authority Level</div>
+          <div class="meta-val" style="color:var(--ok)">Full Policy Admin</div>
+        </div>
+      </div>
+
+      <div class="step" style="background:#faf6f1">
+        <h4>Assigned Permissions:</h4>
+        <ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted);line-height:1.5">
+          <li>✓ Real-time on-device computer vision execution</li>
+          <li>✓ Batch lot quarantine & stop-ship override</li>
+          <li>✓ Zero-cost RMA replacement dispatch</li>
+          <li>✓ Full claim history CSV export</li>
+        </ul>
+      </div>
+
+      <div style="margin-top:6px">
+        <label class="muted" style="font-size:12px;font-weight:600">Quick-Switch Operational Persona:</label>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button class="btn" style="font-size:11.5px;padding:6px 10px" id="auth-switch-analyst">🔍 Claims Analyst (Priya)</button>
+          <button class="btn" style="font-size:11.5px;padding:6px 10px" id="auth-switch-quality">🛠️ Quality Lead (Marcus)</button>
+        </div>
+      </div>
+    `;
+
+    actions.innerHTML = `
+      <button class="btn danger" id="auth-modal-logout-btn">🚪 Sign Out</button>
+      <button class="btn" id="auth-modal-close-action">Close</button>
+    `;
+
+    $("auth-modal-logout-btn").addEventListener("click", () => {
+      logoutUser();
+      closeAuthModal();
+    });
+    $("auth-modal-close-action").addEventListener("click", closeAuthModal);
+
+    $("auth-switch-analyst").addEventListener("click", () => {
+      loginUser({
+        name: "Priya Reddy",
+        email: "priya.r@indi-arbiter.io",
+        role: "RMA Claims Analyst",
+        avatar: "PR",
+        token: "ARB-AUTH-77192"
+      });
+      closeAuthModal();
+    });
+
+    $("auth-switch-quality").addEventListener("click", () => {
+      loginUser({
+        name: "Marcus Vance",
+        email: "marcus.v@indi-arbiter.io",
+        role: "Quality Lead Engineer",
+        avatar: "MV",
+        token: "ARB-AUTH-66014"
+      });
+      closeAuthModal();
+    });
+  } else {
+    title.textContent = "Sign In to Indi Arbiter";
+    badge.className = "badge alert";
+    badge.textContent = "Guest Access";
+
+    body.innerHTML = `
+      <div class="field">
+        <label>Work Email</label>
+        <input id="auth-input-email" type="email" value="suyash@indi-arbiter.io" />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="auth-input-pass" type="password" value="••••••••••••" />
+      </div>
+
+      <div style="margin:12px 0 6px">
+        <label class="muted" style="font-size:12px;font-weight:600">Or Quick-Login with Demo Profile:</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          <button class="btn" style="text-align:left;font-size:12px;display:flex;justify-content:space-between" id="auth-quick-admin">
+            <span>👑 <strong>Suyash Sharma</strong> (Operations Admin)</span>
+            <span class="badge ok">1-Click</span>
+          </button>
+          <button class="btn" style="text-align:left;font-size:12px;display:flex;justify-content:space-between" id="auth-quick-analyst">
+            <span>🔍 <strong>Priya Reddy</strong> (Claims Analyst)</span>
+            <span class="badge replace">1-Click</span>
+          </button>
+          <button class="btn" style="text-align:left;font-size:12px;display:flex;justify-content:space-between" id="auth-quick-quality">
+            <span>🛠️ <strong>Marcus Vance</strong> (Quality Lead)</span>
+            <span class="badge replace">1-Click</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    actions.innerHTML = `
+      <button class="btn primary" id="auth-modal-login-btn">🔑 Sign In</button>
+      <button class="btn" id="auth-modal-close-action">Cancel</button>
+    `;
+
+    $("auth-modal-login-btn").addEventListener("click", () => {
+      const email = $("auth-input-email").value || "suyash@indi-arbiter.io";
+      loginUser({
+        name: email.split("@")[0].charAt(0).toUpperCase() + email.split("@")[0].slice(1),
+        email,
+        role: "Operations Admin",
+        avatar: "SA",
+        token: `ARB-AUTH-${Math.floor(10000 + Math.random() * 90000)}`
+      });
+      closeAuthModal();
+    });
+
+    $("auth-quick-admin").addEventListener("click", () => {
+      loginUser({
+        name: "Suyash Sharma",
+        email: "suyash@indi-arbiter.io",
+        role: "Operations Admin",
+        avatar: "SS",
+        token: "ARB-AUTH-88421"
+      });
+      closeAuthModal();
+    });
+
+    $("auth-quick-analyst").addEventListener("click", () => {
+      loginUser({
+        name: "Priya Reddy",
+        email: "priya.r@indi-arbiter.io",
+        role: "RMA Claims Analyst",
+        avatar: "PR",
+        token: "ARB-AUTH-77192"
+      });
+      closeAuthModal();
+    });
+
+    $("auth-quick-quality").addEventListener("click", () => {
+      loginUser({
+        name: "Marcus Vance",
+        email: "marcus.v@indi-arbiter.io",
+        role: "Quality Lead Engineer",
+        avatar: "MV",
+        token: "ARB-AUTH-66014"
+      });
+      closeAuthModal();
+    });
+
+    $("auth-modal-close-action").addEventListener("click", closeAuthModal);
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeAuthModal() {
+  const modal = $("auth-modal");
+  if (modal) modal.classList.add("hidden");
+}
+
+function loginUser(userObj) {
+  authState.isLoggedIn = true;
+  authState.user = userObj;
+  renderAuthUI();
+  showToast("Welcome Back!", `Signed in as ${userObj.name} (${userObj.role}).`, "success");
+}
+
+function logoutUser() {
+  authState.isLoggedIn = false;
+  renderAuthUI();
+  showToast("Signed Out", "You are now in guest read-only mode.", "info");
+}
+
+// CSV Export Utility
+function exportClaimsCSV() {
+  const headers = ["Claim ID", "Created Date", "Serial Number", "Batch ID", "Component", "Customer Reason", "Decision", "Root Cause Analysis"];
+  const rows = FLEET.claims.map((c) => [
+    c.id,
+    c.createdAt,
+    c.serial,
+    c.batch,
+    `"${c.component}"`,
+    `"${c.reason}"`,
+    c.decision,
+    `"${c.rootCause || 'Evaluated by Arbiter'}"`
+  ]);
+
+  const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `indi_arbiter_claims_10k_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast("CSV Export Complete", `Downloaded ${FLEET.claims.length.toLocaleString()} claim records.`, "success");
+}
+
+// Global Event Listeners & Bindings
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => setView(btn.dataset.view));
 });
@@ -1122,14 +1552,71 @@ $("modal-close-btn").addEventListener("click", closeClaimModal);
 $("claim-modal").addEventListener("click", (e) => {
   if (e.target === $("claim-modal")) closeClaimModal();
 });
+
+const authModalClose = $("auth-modal-close-btn");
+if (authModalClose) authModalClose.addEventListener("click", closeAuthModal);
+const authModalOverlay = $("auth-modal");
+if (authModalOverlay) {
+  authModalOverlay.addEventListener("click", (e) => {
+    if (e.target === authModalOverlay) closeAuthModal();
+  });
+}
+
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeClaimModal();
+  if (e.key === "Escape") {
+    closeClaimModal();
+    closeAuthModal();
+  }
 });
 
-// Initialization
+// Sidebar Interactive Controls
+const sidebarInput = $("sidebar-serial-input");
+if (sidebarInput) {
+  sidebarInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && sidebarInput.value.trim()) {
+      setView("intake");
+      $("serial").value = sidebarInput.value.trim();
+      onSerial();
+      generate("mfg-left");
+      showToast("Serial Loaded", `Loaded ${sidebarInput.value.trim()} into Intake Arbiter.`, "info");
+      sidebarInput.value = "";
+    }
+  });
+}
+
+const sidebarA47 = $("sidebar-btn-a47");
+if (sidebarA47) sidebarA47.addEventListener("click", () => playDemo("a47"));
+
+const sidebarDamage = $("sidebar-btn-damage");
+if (sidebarDamage) sidebarDamage.addEventListener("click", () => playDemo("reject"));
+
+const sidebarExport = $("sidebar-btn-export");
+if (sidebarExport) sidebarExport.addEventListener("click", exportClaimsCSV);
+
+const histExport = $("btn-export-history");
+if (histExport) histExport.addEventListener("click", exportClaimsCSV);
+
+const userCard = $("sidebar-user-card");
+if (userCard) {
+  userCard.addEventListener("click", (e) => {
+    if (e.target.id === "sidebar-auth-btn") {
+      if (authState.isLoggedIn) logoutUser();
+      else openAuthModal();
+    } else {
+      openAuthModal();
+    }
+  });
+}
+
+const brandLogo = $("brand-logo-btn");
+if (brandLogo) brandLogo.addEventListener("click", () => setView("intel"));
+
+// App Initialization
+renderAuthUI();
 renderKpis();
 renderChips();
 renderHistory();
 $("serial").value = "PB-A47-01041";
 onSerial();
+
 
