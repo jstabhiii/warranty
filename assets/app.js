@@ -65,13 +65,13 @@ function openClaimModal(claimId) {
       </div>
       <div class="meta-item">
         <div class="meta-label">Warranty Status</div>
-        <div class="meta-val" style="color:${inWarranty ? "var(--cyan)" : "var(--red)"}">
+        <div class="meta-val" style="color:${inWarranty ? "var(--ok)" : "var(--red)"}">
           ${inWarranty ? "Active In-Warranty" : "Expired Warranty"}
         </div>
       </div>
     </div>
 
-    <div class="step" style="background:#0b0f16">
+    <div class="step" style="background:#faf6f1">
       <h4>Adjudication Recommendation: <span class="badge ${c.decision.toLowerCase()}">${c.decision}</span></h4>
       <p style="margin-top:6px">
         ${c.decision === "Replace" 

@@ -146,7 +146,7 @@ function makeDemoImage(kind) {
     ctx.beginPath();
     ctx.arc(x, y, 48, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "#3ee0c3";
+    ctx.strokeStyle = "#ff6600";
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(x, y, 78, 0, Math.PI * 2);
